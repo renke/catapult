@@ -281,6 +281,7 @@ class Catapult(object):
 
     def show(self, *vargs):
         self.win.show_all()
+        self.scrolled.hide()
         self.win.get_window().focus(Gdk.CURRENT_TIME)
 
     def handle_show(self, window):
