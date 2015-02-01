@@ -16,9 +16,9 @@ config = {
     "show_binding": "<Ctrl>Return",
 
     # Fonts
-    "entry_font": "Ubuntu 40",
+    "entry_font": "Ubuntu 30",
     "name_font": "Ubuntu 18",
-    "description_font": "Ubuntu 12",
+    "description_font": "Ubuntu 12.5",
 
     # UI
     "visible_items": 5,
@@ -420,6 +420,8 @@ class Catapult(object):
                 if item["description"]:
                     content += "\n" + "<span font='%s'>%s</span>" % (self.config["description_font"],
                         cgi.escape(item["description"],))
+                else:
+                    content += "\n" + "<span font='%s'> </span>" % (self.config["description_font"],)
 
                 if item["indexer"].launchable(item):
                         self.store.append([item["icon"], content, item])
