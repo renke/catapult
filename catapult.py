@@ -1,9 +1,11 @@
 #!/usr/bin/python
 from __future__ import division
 
+import cgi
 import os
 import signal
 import sys
+
 from time import sleep
 
 from gi.repository import Gtk, Gdk, GdkPixbuf, Pango, GLib, Keybinder, Gio
@@ -77,6 +79,9 @@ class DirectoryIndexer(object):
 
         launch(func)
 
+    def launchable(self, item):
+        return os.path.isdir(item["description"])
+
 
 class ApplicationIndexer(object):
     def provide(self):
@@ -133,9 +138,11 @@ class ApplicationIndexer(object):
 
         launch(func)
 
+    def launchable(self, item):
+        return item["command"].strip() != ""
+
 
 class Catapult(object):
-
     def __init__(self):
 
         next_accels = map(Gtk.accelerator_parse, [
@@ -205,19 +212,19 @@ class Catapult(object):
 
         self.tree = Gtk.TreeView(self.store)
 
-        self.tree.override_font(Pango.FontDescription.from_string("Ubuntu 20"))
+        self.tree.override_font(Pango.FontDescription.from_string("Ubuntu 18"))
         self.tree.set_headers_visible(False)
 
         self.tree.get_selection().set_mode(Gtk.SelectionMode.BROWSE)
 
-        self.name_renderer = Gtk.CellRendererText()
-        name_column = Gtk.TreeViewColumn("Name", self.name_renderer, text=1)
+        self.content_renderer = Gtk.CellRendererText()
+        content_column = Gtk.TreeViewColumn("Name", self.content_renderer, markup=1)
 
         self.icon_renderer = Gtk.CellRendererPixbuf()
         icon_column = Gtk.TreeViewColumn("Icon", self.icon_renderer, pixbuf=0)
 
         self.tree.append_column(icon_column)
-        self.tree.append_column(name_column)
+        self.tree.append_column(content_column)
 
         self.tree.set_search_column(-1)
 
@@ -302,7 +309,13 @@ class Catapult(object):
             items = self.index.search(input)
 
             for item in items:
-                self.store.append([item["icon"], item["name"], item])
+                content = cgi.escape(item["name"])
+
+                if item["description"]:
+                    content += "\n" + "<span font='12.5'>%s</span>" % (cgi.escape(item["description"],))
+
+                if item["indexer"].launchable(item):
+                        self.store.append([item["icon"], content, item])
 
             if items:
                 self.next_choice()
@@ -320,7 +333,8 @@ class Catapult(object):
         else:
             self.scrolled.show()
 
-        row_height = self.tree.get_column(0).cell_get_size()[3]
+        row_height = max(self.tree.get_column(0).cell_get_size()[3],
+                         self.tree.get_column(1).cell_get_size()[3])
 
         self.scrolled.set_min_content_height(n * row_height)
         self.scrolled.set_min_content_width(0)
