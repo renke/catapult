@@ -382,6 +382,10 @@ def launch(func):
     if grandchild > 0:
         sys.exit(0)
 
+    os.chdir(os.path.expanduser("~"))
+    os.setsid()
+    os.umask(0)
+
     sys.stdout.flush()
     sys.stderr.flush()
 
