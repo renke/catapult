@@ -52,6 +52,8 @@ class DirectoryIndexer(object):
             GLib.USER_DIRECTORY_VIDEOS,
         ]
 
+        user_dir_names.sort()
+
         user_dirs = map(GLib.get_user_special_dir, user_dir_names)
 
         icon_theme = Gtk.IconTheme.get_default()
@@ -132,6 +134,8 @@ class ApplicationIndexer(object):
                     }
 
                     items.append(item)
+
+        items.sort(key=lambda i: i["name"])
 
         return items
 
