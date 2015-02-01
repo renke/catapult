@@ -2,6 +2,7 @@
 from __future__ import division
 
 import cgi
+import glob
 import os
 import signal
 import sys
@@ -10,7 +11,31 @@ from time import sleep
 
 from gi.repository import Gtk, Gdk, GdkPixbuf, Pango, GLib, Keybinder, Gio
 
-max_visible_rows = 5
+config = {
+    "show_binding": "<Ctrl>Return",
+    "visible_items": 5,
+    "icon_size": 44,
+
+    "directory_indexer": {
+        "include": [
+            "~/Documents/*",
+            "~/Projects/*",
+        ]
+    },
+
+    "application_indexer": {
+        "directories": [
+            "~/.local/share/applications",
+            "/usr/share/applications",
+            "/usr/local/share/applications",
+        ]
+        # "terminal_emulator_command": "x-terminal-emulator -e"
+    },
+}
+
+
+def get_config():
+    return config
 
 
 class Index(object):
@@ -38,9 +63,21 @@ class Index(object):
 
 
 class DirectoryIndexer(object):
+    def get_name(self):
+        return "directory_indexer"
+
+    def configure(self, config, all_config):
+        try:
+            self.icon_size = all_config["icon_size"]
+        except KeyError:
+            self.icon_size = 32
+
+        try:
+            self.include_dir_globs = config["include"]
+        except KeyError:
+            self.include_dir_globs = []
 
     def provide(self):
-
         user_dir_names = [
             GLib.USER_DIRECTORY_DESKTOP,
             GLib.USER_DIRECTORY_DOCUMENTS,
@@ -54,10 +91,15 @@ class DirectoryIndexer(object):
 
         user_dir_names.sort()
 
-        user_dirs = map(GLib.get_user_special_dir, user_dir_names)
+        dirs = map(GLib.get_user_special_dir, user_dir_names)
+
+        for include_glob in self.include_dir_globs:
+            include_paths = glob.glob(os.path.expanduser(include_glob))
+            include_dirs = filter(os.path.isdir, include_paths)
+            dirs.extend(include_dirs)
 
         icon_theme = Gtk.IconTheme.get_default()
-        icon = Gtk.IconTheme.load_icon(icon_theme, "folder", 44, 0)
+        icon = Gtk.IconTheme.load_icon(icon_theme, "folder", self.icon_size, 0)
 
         def build_item(user_dir):
             return {
@@ -70,7 +112,7 @@ class DirectoryIndexer(object):
                 "words": [GLib.path_get_basename(user_dir)],
             }
 
-        return map(build_item, user_dirs)
+        return map(build_item, dirs)
 
     def launch(self, item):
         item_uri = Gio.File.new_for_path(item["description"]).get_uri()
@@ -86,54 +128,83 @@ class DirectoryIndexer(object):
 
 
 class ApplicationIndexer(object):
+    def get_name(self):
+        return "application_indexer"
+
+    def configure(self, config, all_config):
+        try:
+            self.icon_size = all_config["icon_size"]
+        except KeyError:
+            self.icon_size = 32
+
+        try:
+            self.app_directories = config["directories"]
+        except KeyError:
+            self.app_directories = [
+                "~/.local/share/applications",
+                "/usr/share/applications",
+                "/usr/local/share/applications",
+            ]
+
+        try:
+            self.terminal_emulator_command = config["terminal_emulator_command"]
+        except (TypeError, KeyError):
+            self.terminal_emulator_command = "x-terminal-emulator -e"
+
     def provide(self):
         from fnmatch import fnmatch
         from xdg.DesktopEntry import DesktopEntry
 
         items = []
 
-        for root, dirs, files in os.walk("/usr/share/applications/"):
-            for filename in files:
-                if fnmatch(filename, "*.desktop"):
-                    app_entry = DesktopEntry(os.path.join(root, filename))
+        for app_directory in map(os.path.expanduser, self.app_directories):
+            for root, dirs, files in os.walk(app_directory):
+                for filename in files:
+                    if fnmatch(filename, "*.desktop"):
+                        app_entry = DesktopEntry(os.path.join(root, filename))
 
-                    icon_theme = Gtk.IconTheme.get_default()
+                        icon_theme = Gtk.IconTheme.get_default()
 
-                    if app_entry.getNoDisplay():
-                        continue
+                        if app_entry.getNoDisplay():
+                            continue
 
-                    if app_entry.getIcon() == "":
-                        icon = Gtk.IconTheme.load_icon(icon_theme, "image-missing", 44, 0)
-                    elif "/" in app_entry.getIcon():
-                        try:
-                            unscaled_icon = GdkPixbuf.Pixbuf.new_from_file(app_entry.getIcon())
-                            icon = unscaled_icon.scale_simple(44, 44, GdkPixbuf.InterpType.BILINEAR)
-                        except:
-                            icon = Gtk.IconTheme.load_icon(icon_theme, "image-missing", 44, 0)
-                    else:
-                        try:
-                            unscaled_icon = Gtk.IconTheme.load_icon(icon_theme, app_entry.getIcon(), 44, 0)
-                            icon = unscaled_icon.scale_simple(44, 44, GdkPixbuf.InterpType.BILINEAR)
-                        except:
-                            icon = Gtk.IconTheme.load_icon(icon_theme, "image-missing", 44, 0)
+                        if app_entry.getIcon() == "":
+                            icon = Gtk.IconTheme.load_icon(icon_theme, "image-missing", self.icon_size, 0)
+                        elif "/" in app_entry.getIcon():
+                            try:
+                                unscaled_icon = GdkPixbuf.Pixbuf.new_from_file(app_entry.getIcon())
+                                icon = unscaled_icon.scale_simple(self.icon_size, self.icon_size, GdkPixbuf.InterpType.BILINEAR)
+                            except:
+                                icon = Gtk.IconTheme.load_icon(icon_theme, "image-missing", self.icon_size, 0)
+                        else:
+                            try:
+                                unscaled_icon = Gtk.IconTheme.load_icon(icon_theme, app_entry.getIcon(), self.icon_size, 0)
+                                icon = unscaled_icon.scale_simple(self.icon_size, self.icon_size, GdkPixbuf.InterpType.BILINEAR)
+                            except:
+                                icon = Gtk.IconTheme.load_icon(icon_theme, "image-missing", self.icon_size, 0)
 
 
-                    words = app_entry.getName().split()
-                    # words.append(app_entry.getExec())
+                        words = app_entry.getName().split()
+                        # words.append(app_entry.getExec())
 
-                    item = {
-                        "indexer": self,
+                        command = app_entry.getExec()
 
-                        "name": app_entry.getName(),
-                        "description": app_entry.getComment(),
-                        "icon": icon,
+                        if app_entry.getTerminal():
+                            command = "%s '%s'" % (self.terminal_emulator_command, command)
 
-                        "command": app_entry.getExec(),
+                        item = {
+                            "indexer": self,
 
-                        "words": words,
-                    }
+                            "name": app_entry.getName(),
+                            "description": app_entry.getComment(),
+                            "icon": icon,
 
-                    items.append(item)
+                            "command": command,
+
+                            "words": words,
+                        }
+
+                        items.append(item)
 
         items.sort(key=lambda i: i["name"])
 
@@ -175,12 +246,21 @@ class Catapult(object):
             (prev_accels, self.prev_choice, "prev")
         ]
 
+        self.config = get_config()
+
         indexers = [
             DirectoryIndexer(),
             ApplicationIndexer(),
         ]
 
+        for indexer in indexers:
+            try:
+                indexer.configure(self.config[indexer.get_name()], self.config or {})
+            except KeyError:
+                indexer.configure({}, self.config or {})
+
         self.index = Index(indexers)
+
 
         self.win = None
         self.tree = None
@@ -284,7 +364,7 @@ class Catapult(object):
         connect_accel(launch_accel, self.launch_choice)
 
         Keybinder.init()
-        Keybinder.bind("<Ctrl>Return", self.show, None)
+        Keybinder.bind(self.config["show_binding"], self.show, None)
 
         self.win.add_accel_group(accel_group)
         self.win.show_all()
@@ -343,7 +423,7 @@ class Catapult(object):
         while Gtk.events_pending():
             Gtk.main_iteration_do(True)
 
-        n = min(self.store.iter_n_children(None), max_visible_rows)
+        n = min(self.store.iter_n_children(None), self.config["visible_items"])
 
         if n == 0:
             self.scrolled.hide()
@@ -378,28 +458,25 @@ class Catapult(object):
         self.hide()
 
     def next_choice(self):
-        selection = self.tree.get_selection()
-        model, tree_iter = selection.get_selected()
+        sel= self.tree.get_selection()
+        model, tree_iter = sel.get_selected()
 
-        if not tree_iter:
-            next_iter = model.get_iter_first()
-        else:
-            next_iter = model.iter_next(tree_iter)
-
-        if next_iter:
-            selection.select_iter(next_iter)
+        self.change_choice(sel, model, tree_iter, model.iter_next)
 
     def prev_choice(self):
-        selection = self.tree.get_selection()
-        model, tree_iter = selection.get_selected()
+        sel = self.tree.get_selection()
+        model, tree_iter = sel.get_selected()
 
+        self.change_choice(sel, model, tree_iter, model.iter_previous)
+
+    def change_choice(self, sel, model, tree_iter, dir_func):
         if not tree_iter:
-            prev_iter = model.get_iter_first()
+            changed_iter = model.get_iter_first()
         else:
-            prev_iter = model.iter_previous(tree_iter)
+            changed_iter = dir_func(tree_iter)
 
-        if prev_iter:
-            selection.select_iter(prev_iter)
+        if changed_iter:
+            sel.select_iter(changed_iter)
 
 
 def launch(func):
