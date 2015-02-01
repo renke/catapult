@@ -232,11 +232,10 @@ class Catapult(object):
         self.tree.get_selection().connect("changed", handle_selection_changed)
 
         self.scrolled = Gtk.ScrolledWindow()
-        self.scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.scrolled.set_policy(Gtk.PolicyType.ALWAYS, Gtk.PolicyType.AUTOMATIC)
 
 
         self.scrolled.add(self.tree)
-        vbox.set_size_request(0, 0)
 
         vbox.pack_start(self.scrolled, False, False, 0)
 
@@ -261,10 +260,11 @@ class Catapult(object):
         connect_accel(launch_accel, self.launch_choice)
 
         Keybinder.init()
-        Keybinder.bind("<Alt><Ctrl>Return", self.show, None)
+        Keybinder.bind("<Ctrl>Return", self.show, None)
 
         self.win.add_accel_group(accel_group)
         self.win.show_all()
+        self.scrolled.hide()
 
         # Gdk.keyboard_grab(self.win.get_window(), False, Gdk.CURRENT_TIME)
 
@@ -313,9 +313,16 @@ class Catapult(object):
             Gtk.main_iteration_do(True)
 
         n = min(self.store.iter_n_children(None), max_visible_rows)
+
+        if n == 0:
+            self.scrolled.hide()
+        else:
+            self.scrolled.show()
+
         row_height = self.tree.get_column(0).cell_get_size()[3]
 
         self.scrolled.set_min_content_height(n * row_height)
+        self.scrolled.set_min_content_width(0)
 
     def handle_key_press(self, widget, event, *args):
         for accels_action in self.accels_actions:
