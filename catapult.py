@@ -129,7 +129,7 @@ class ApplicationIndexer(object):
 
         def func():
             import subprocess
-            subprocess.Popen(command)
+            subprocess.Popen(command.split())
 
         launch(func)
 
