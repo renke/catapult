@@ -12,10 +12,19 @@ from time import sleep
 from gi.repository import Gtk, Gdk, GdkPixbuf, Pango, GLib, Keybinder, Gio
 
 config = {
+    # Bindings
     "show_binding": "<Ctrl>Return",
+
+    # Fonts
+    "entry_font": "Ubuntu 40",
+    "name_font": "Ubuntu 18",
+    "description_font": "Ubuntu 12",
+
+    # UI
     "visible_items": 5,
     "icon_size": 44,
 
+    # Indexers
     "directory_indexer": {
         "include": [
             "~/Documents/*",
@@ -297,7 +306,7 @@ class Catapult(object):
 
         self.entry = Gtk.Entry()
         self.entry.override_font(
-            Pango.FontDescription.from_string("Ubuntu 30"))
+            Pango.FontDescription.from_string(self.config["entry_font"]))
         # self.entry.set_text("Test")
 
         self.entry.connect("key-press-event", self.handle_key_press)
@@ -309,7 +318,7 @@ class Catapult(object):
 
         self.tree = Gtk.TreeView(self.store)
 
-        self.tree.override_font(Pango.FontDescription.from_string("Ubuntu 18"))
+        self.tree.override_font(Pango.FontDescription.from_string(self.config["name_font"]))
         self.tree.set_headers_visible(False)
 
         self.tree.get_selection().set_mode(Gtk.SelectionMode.BROWSE)
@@ -409,7 +418,8 @@ class Catapult(object):
                 content = cgi.escape(item["name"])
 
                 if item["description"]:
-                    content += "\n" + "<span font='12.5'>%s</span>" % (cgi.escape(item["description"],))
+                    content += "\n" + "<span font='%s'>%s</span>" % (self.config["description_font"],
+                        cgi.escape(item["description"],))
 
                 if item["indexer"].launchable(item):
                         self.store.append([item["icon"], content, item])
