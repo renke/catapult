@@ -97,11 +97,24 @@ class ApplicationIndexer(object):
 
                     icon_theme = Gtk.IconTheme.get_default()
 
-                    try:
-                        unscaled_icon = Gtk.IconTheme.load_icon(icon_theme, app_entry.getIcon(), 44, 0)
-                        icon = unscaled_icon.scale_simple(44, 44, GdkPixbuf.InterpType.BILINEAR)
-                    except:
-                        icon = Gtk.IconTheme.load_icon(icon_theme, "folder", 44, 0)
+                    if app_entry.getNoDisplay():
+                        continue
+
+                    if app_entry.getIcon() == "":
+                        icon = Gtk.IconTheme.load_icon(icon_theme, "image-missing", 44, 0)
+                    elif "/" in app_entry.getIcon():
+                        try:
+                            unscaled_icon = GdkPixbuf.Pixbuf.new_from_file(app_entry.getIcon())
+                            icon = unscaled_icon.scale_simple(44, 44, GdkPixbuf.InterpType.BILINEAR)
+                        except:
+                            icon = Gtk.IconTheme.load_icon(icon_theme, "image-missing", 44, 0)
+                    else:
+                        try:
+                            unscaled_icon = Gtk.IconTheme.load_icon(icon_theme, app_entry.getIcon(), 44, 0)
+                            icon = unscaled_icon.scale_simple(44, 44, GdkPixbuf.InterpType.BILINEAR)
+                        except:
+                            icon = Gtk.IconTheme.load_icon(icon_theme, "image-missing", 44, 0)
+
 
                     words = app_entry.getName().split()
                     # words.append(app_entry.getExec())
