@@ -495,9 +495,6 @@ def launch(func):
 
     grandchild = os.fork()
 
-    if grandchild > 0:
-        sys.exit(0)
-
     os.chdir(os.path.expanduser("~"))
     os.setsid()
     os.umask(0)
@@ -512,6 +509,9 @@ def launch(func):
     os.dup2(stdin.fileno(), sys.stdin.fileno())
     os.dup2(stdout.fileno(), sys.stdout.fileno())
     os.dup2(stderr.fileno(), sys.stderr.fileno())
+
+    if grandchild > 0:
+        sys.exit(0)
 
     func()
 
