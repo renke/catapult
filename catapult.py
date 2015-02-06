@@ -431,10 +431,6 @@ class Catapult(object):
         else:
             self.store.clear()
 
-        # Force redraw so we can get the cell
-        while Gtk.events_pending():
-            Gtk.main_iteration_do(True)
-
         n = min(self.store.iter_n_children(None), self.config["visible_items"])
 
         if n == 0:
