@@ -4,6 +4,7 @@ from __future__ import division
 import cgi
 import glob
 import os
+import shlex
 import signal
 import sys
 
@@ -196,7 +197,8 @@ class ApplicationIndexer(object):
                         words = app_entry.getName().split()
                         # words.append(app_entry.getExec())
 
-                        command = app_entry.getExec()
+                        command = self.escape_command(app_entry.getExec())
+
 
                         if app_entry.getTerminal():
                             command = "%s '%s'" % (self.terminal_emulator_command, command)
@@ -218,6 +220,10 @@ class ApplicationIndexer(object):
         items.sort(key=lambda i: i["name"])
 
         return items
+
+    @staticmethod
+    def escape_command(command):
+        return " ".join(shlex.split(command))
 
     def launch(self, item):
         codes = ["%f", "%F", "%u", "%U", "%i", "%c", "%k"]
