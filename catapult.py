@@ -3,16 +3,18 @@ from __future__ import division
 
 import cgi
 import glob
+import json
 import os
 import shlex
 import signal
 import sys
+import xdg.BaseDirectory
 
 from time import sleep
 
 from gi.repository import Gtk, Gdk, GdkPixbuf, Pango, GLib, Keybinder, Gio
 
-config = {
+default_config = {
     # Bindings
     "show_binding": "<Ctrl>Return",
 
@@ -29,6 +31,7 @@ config = {
     "directory_indexer": {
         "include": [
             "~/Documents/*",
+            "~/Projects",
             "~/Projects/*",
         ]
     },
@@ -44,8 +47,48 @@ config = {
 }
 
 
+def get_default_config():
+    return default_config
+
+
 def get_config():
-    return config
+    try:
+        if os.environ["CATAPULT_NO_CONFIG"]:
+            return default_config
+    except KeyError:
+        pass
+
+    try:
+        home_dir = os.path.expanduser("~")
+        config_file_name = os.path.join(home_dir, ".catapultrc")
+        return load_config(config_file_name)
+    except IOError:
+        pass
+    except ValueError:
+        show_config_not_loaded_error(config_file_name)
+
+    config_dirs = xdg.BaseDirectory.load_config_paths("catapult")
+
+    for config_dir in config_dirs:
+        try:
+            config_file_name = os.path.join(config_dir, "catapultrc")
+            return load_config(config_file_name)
+        except IOError:
+            pass
+        except ValueError:
+            show_config_not_loaded_error(config_file_name)
+
+    return default_config
+
+
+def show_config_not_loaded_error(config_file_name):
+    print "Configuration %s could not be loaded" % (config_file_name,)
+
+
+def load_config(filename):
+    with open(filename, "r") as config_file:
+        config = json.load(config_file)
+        return dict(get_default_config().items() + config.items())
 
 
 class Index(object):
@@ -77,15 +120,8 @@ class DirectoryIndexer(object):
         return "directory_indexer"
 
     def configure(self, config, all_config):
-        try:
-            self.icon_size = all_config["icon_size"]
-        except KeyError:
-            self.icon_size = 32
-
-        try:
-            self.include_dir_globs = config["include"]
-        except KeyError:
-            self.include_dir_globs = []
+        self.icon_size = all_config["icon_size"]
+        self.include_dir_globs = config["include"]
 
     def provide(self):
         user_dir_names = [
@@ -142,24 +178,9 @@ class ApplicationIndexer(object):
         return "application_indexer"
 
     def configure(self, config, all_config):
-        try:
-            self.icon_size = all_config["icon_size"]
-        except KeyError:
-            self.icon_size = 32
-
-        try:
-            self.app_directories = config["directories"]
-        except KeyError:
-            self.app_directories = [
-                "~/.local/share/applications",
-                "/usr/share/applications",
-                "/usr/local/share/applications",
-            ]
-
-        try:
-            self.terminal_emulator_command = config["terminal_emulator_command"]
-        except (TypeError, KeyError):
-            self.terminal_emulator_command = "x-terminal-emulator -e"
+        self.icon_size = all_config["icon_size"]
+        self.app_directories = config["directories"]
+        self.terminal_emulator_command = "x-terminal-emulator -e"
 
     def provide(self):
         from fnmatch import fnmatch
@@ -245,6 +266,7 @@ class ApplicationIndexer(object):
         return item["command"].strip() != ""
 
 
+
 class Catapult(object):
     def __init__(self):
 
@@ -275,7 +297,6 @@ class Catapult(object):
                 indexer.configure({}, self.config or {})
 
         self.index = Index(indexers)
-
 
         self.win = None
         self.tree = None
@@ -311,9 +332,9 @@ class Catapult(object):
         self.win.add(vbox)
 
         self.entry = Gtk.Entry()
+
         self.entry.override_font(
             Pango.FontDescription.from_string(self.config["entry_font"]))
-        # self.entry.set_text("Test")
 
         self.entry.connect("key-press-event", self.handle_key_press)
         self.entry.connect("changed", self.handle_input)
